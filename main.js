@@ -3,7 +3,7 @@
 TrelloPowerUp.initialize({
   'card-buttons': function(t, options) {
     return [{
-      icon: 'https://kaman-oferty.vercel.app/favicon.ico', // Ikona może być z Twojej głównej strony
+      icon: 'https://cdn.jsdelivr.net/npm/heroicons/outline/document-plus.svg', // Ikona może być z Twojej głównej strony
       text: 'Generuj Ofertę Kaman',
       callback: function(t) {
         return t.card('id', 'name')
