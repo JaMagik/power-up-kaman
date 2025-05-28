@@ -14,7 +14,7 @@ TrelloPowerUp.initialize({
               title: 'Generator Ofert Kaman',
               url: url,
               height: 750,
-              width: 600
+              width: 800
             });
           });
       }
