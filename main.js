@@ -1,43 +1,23 @@
-// W pliku main.js Twojego Power-Upa
-console.log('Power-Up main.js ŁADOWANY - Test API Key');
-
-const TRELLO_APP_NAME = 'Generuj ofertę Kaman'; // Nazwa wyświetlana użytkownikowi
+// main.js
 
 TrelloPowerUp.initialize({
-  'card-buttons': function(t_button_main, options) { // Zmieniona nazwa kontekstu dla przejrzystości
-    console.log('Power-Up: card-buttons capability wywołana');
-    try {
-      return [{
-        icon: 'https://cdn.jsdelivr.net/npm/heroicons/outline/document-plus.svg',
-        text: 'Test Autoryzacji',
-        callback: function(t_button_callback) { // Kontekst dla konkretnego przycisku
-          console.log('Power-Up: Przycisk "Test Autoryzacji" kliknięty');
-
-          // Bezpośrednia próba autoryzacji
-          return t_button_callback.getRestApi()
-            .authorize({
-              scope: 'read,write',
-              expiration: '1day',
-              name: TRELLO_APP_NAME
-            })
-            .then(function(token) {
-              console.log('Power-Up: Autoryzacja udana, token:', token);
-              if (token) {
-                alert('Autoryzacja Trello zakończona sukcesem! Token: ' + token.substring(0, 10) + '...');
-              } else {
-                alert('Autoryzacja Trello nie powiodła się (brak tokena).');
-              }
-            })
-            .catch(function(authorizeError) {
-              console.error("Power-Up: Błąd podczas .authorize():", authorizeError);
-              alert('Błąd podczas autoryzacji Trello: ' + authorizeError.message);
+  'card-buttons': function(t, options) {
+    return [{
+      icon: 'https://cdn.jsdelivr.net/npm/heroicons/outline/document-plus.svg', // Ikona może być z Twojej głównej strony
+      text: 'Generuj Ofertę Kaman',
+      callback: function(t) {
+        return t.card('id', 'name')
+          .then(function(card) {
+            // Tutaj jest logika, która otwiera Twoją GŁÓWNĄ aplikację
+            const url = `https://kaman-oferty.vercel.app/?trelloCardId=${card.id}`;
+            return t.popup({
+              title: 'Generator Ofert Kaman',
+              url: url,
+              height: 750,
+              width: 800
             });
-        }
-      }];
-    } catch (e) {
-      console.error('Power-Up: Błąd w definicji card-buttons:', e);
-      return [];
-    }
+          });
+      }
+    }];
   }
 });
-console.log('Power-Up main.js - Inicjalizacja zakończona');
