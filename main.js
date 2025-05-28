@@ -1,7 +1,7 @@
 // W pliku main.js Twojego Power-Upa
 
 const TRELLO_API_KEY = '0f932c28c8d97d03741c8863c2ff4afb'; // Ten sam co w React App
-const TRELLO_APP_NAME = 'Generowanie Ofert'; // Lub inna nazwa, którą nadałeś
+const TRELLO_APP_NAME = 'Generuj ofertę Kaman'; // Lub inna nazwa, którą nadałeś
 
 TrelloPowerUp.initialize({
   'card-buttons': function(t, options) {
