@@ -1,7 +1,7 @@
 // main.js - KROK 1: Przywracanie popupu
 
 // Upewnij się, że ta stała jest poprawna! Zastąp <TWOJA_RZECZYWISTA_NAZWA_APLIKACJI>
-const KAMAN_APP_URL = 'https://<TWOJA_RZECZYWISTA_NAZWA_APLIKACJI>.vercel.app';
+const KAMAN_APP_URL = 'https://kaman-oferty-trello.vercel.app/';
 // const KAMAN_APP_URL = 'http://localhost:5173'; // Jeśli testujesz lokalnie z Vite
 
 console.log('START: main.js Power-Up skrypt ładowany');
