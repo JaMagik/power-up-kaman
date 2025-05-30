@@ -1,84 +1,83 @@
-// main.js - KROK 1: Przywracanie popupu
+// main.js - Wersja do obsługi t.attach()
 
-// Upewnij się, że ta stała jest poprawna! Zastąp <TWOJA_RZECZYWISTA_NAZWA_APLIKACJI>
-const KAMAN_APP_URL = 'https://kaman-oferty-trello.vercel.app/';
-// const KAMAN_APP_URL = 'http://localhost:5173'; // Jeśli testujesz lokalnie z Vite
+// Upewnij się, że ta stała jest poprawna!
+const KAMAN_APP_URL = 'https://<TWOJA_RZECZYWISTA_NAZWA_APLIKACJI>.vercel.app';
+// const KAMAN_APP_URL = 'http://localhost:5173'; // Dla testów lokalnych
+
+let currentTContextForPopup = null; // Zmienna do przechowywania kontekstu 't' dla operacji z popupu
 
 console.log('START: main.js Power-Up skrypt ładowany');
 
-try {
-  TrelloPowerUp.initialize({
-    'card-buttons': function(t, options) {
-      console.log('SUCCESS: card-buttons capability wywołana. Kontekst t:', t);
-      try {
-        return [{
-          icon: 'https://cdn.jsdelivr.net/npm/heroicons/outline/document-plus.svg', // Zmieniona ikona na Twoją
-          text: 'Generuj ofertę Kaman', // Zmieniony tekst na Twój
-          callback: function(t_button_context) {
-            console.log('SUCCESS: Callback "Generuj ofertę Kaman" wywołany. Kontekst t_button_context:', t_button_context);
-            try {
-              return t_button_context.card('id', 'name')
-                .then(function(card) {
-                  const cardId = card.id;
-                  const url = `${KAMAN_APP_URL}/?trelloCardId=${cardId}`; // Użyj URL-a Twojej aplikacji
-                  // const url = 'https://www.example.com'; // Alternatywnie, na początek bardzo prosty URL
-                  
-                  console.log('Próba otwarcia popupu z URL:', url);
-                  
-                  // Zapisz kontekst 't', aby listener 'message' mógł go potencjalnie użyć
-                  // To jest nadal obejście, ale może być potrzebne
-                  window.currentTrelloContext = t_button_context; 
-                  window.currentCardId = cardId; // Zapisz też cardId, jeśli listener go potrzebuje
-
-                  return t_button_context.popup({
-                    title: 'Generator Ofert Kaman',
-                    url: url,
-                    height: 750, // Wysokość, której używałeś
-                    args: { // Przekaż argumenty, Twoja aplikacja w popupie może je odczytać przez t.arg('cardId')
-                        cardId: cardId,
-                        KAMAN_APP_URL: KAMAN_APP_URL // Możesz przekazać URL, jeśli jest potrzebny w popupie
-                    }
-                  });
-                })
-                .catch(function(error) {
-                  console.error('ERROR: Błąd w callbacku podczas pobierania danych karty lub otwierania popupu:', error);
-                  t_button_context.alert({
-                    message: `Błąd otwierania popupu: ${error.message || error}`,
-                    duration: 5,
-                    display: 'error'
-                  });
-                });
-            } catch (callbackError) {
-              console.error('ERROR: Krytyczny błąd wewnątrz callbacku "Generuj ofertę Kaman":', callbackError);
-              // Spróbuj wyświetlić alert Trello, jeśli t_button_context jest dostępne
-              if (t_button_context && t_button_context.alert) {
-                t_button_context.alert({ message: 'Wystąpił krytyczny błąd w callbacku.', duration: 5, display: 'error' });
-              }
-            }
-          }
-        }];
-      } catch (capabilityError) {
-        console.error('ERROR: Krytyczny błąd podczas definiowania capabilities (np. card-buttons):', capabilityError);
-        return [];
+TrelloPowerUp.initialize({
+  'card-buttons': function(t_button_context, options) {
+    console.log('SUCCESS: card-buttons capability wywołana. Kontekst t_button_context:', t_button_context);
+    return [{
+      icon: 'https://cdn.jsdelivr.net/npm/heroicons/outline/document-plus.svg',
+      text: 'Generuj ofertę Kaman',
+      callback: function(t_cb_context) { // Kontekst 't' specyficzny dla tego wywołania
+        currentTContextForPopup = t_cb_context; // Zapisz kontekst dla listenera wiadomości
+        console.log('SUCCESS: Callback "Generuj ofertę Kaman" wywołany.');
+        return t_cb_context.card('id', 'name')
+          .then(function(card) {
+            const cardId = card.id;
+            const url = `<span class="math-inline">\{KAMAN\_APP\_URL\}/?trelloCardId\=</span>{cardId}`;
+            console.log('Próba otwarcia popupu z URL:', url);
+            return t_cb_context.popup({
+              title: 'Generator Ofert Kaman',
+              url: url,
+              height: 750,
+              args: { cardId: card.id }
+            });
+          })
+          .catch(function(error) {
+            console.error('ERROR: Błąd w callbacku card-buttons:', error);
+            currentTContextForPopup.alert({ message: `Błąd: ${error.message || error}`, duration: 5, display: 'error' });
+          });
       }
-    }
-  });
-  console.log('SUCCESS: TrelloPowerUp.initialize zostało wywołane bez rzucenia błędu.');
-} catch (initError) {
-  console.error('ERROR: Krytyczny błąd podczas TrelloPowerUp.initialize:', initError);
-}
+    }];
+  }
+  // Możesz dodać inne capabilities tutaj, np. autoryzacyjne, jeśli planujesz używać własnego API do innych celów
+});
+console.log('SUCCESS: TrelloPowerUp.initialize wywołane.');
 
-// Na razie zostaw zakomentowany globalny listener wiadomości
-/*
-console.log('Próba dodania globalnego listenera wiadomości');
-try {
-  window.addEventListener('message', async (event) => {
-    console.log('Odebrano wiadomość w globalnym listenerze:', event.data);
-    // Tutaj byłaby bardziej złożona logika, ale na razie ją pomijamy
-  });
-  console.log('SUCCESS: Globalny listener wiadomości dodany.');
-} catch (listenerError) {
-  console.error('ERROR: Błąd podczas dodawania globalnego listenera wiadomości:', listenerError);
-}
-*/
-console.log('END: main.js Power-Up skrypt zakończył ładowanie.');
+window.addEventListener('message', async (event) => {
+  console.log('Odebrano wiadomość w main.js:', event.data, 'z origin:', event.origin);
+
+  // Proste sprawdzenie origin dla bezpieczeństwa. Dostosuj, jeśli KAMAN_APP_URL jest dynamiczny lub testujesz lokalnie.
+  // if (event.origin !== KAMAN_APP_URL && !KAMAN_APP_URL.startsWith('http://localhost')) {
+  //   console.warn('Odrzucono wiadomość z nieoczekiwanego źródła:', event.origin);
+  //   return;
+  // }
+
+  const eventData = event.data;
+  const t = currentTContextForPopup; // Użyj zapisanego kontekstu 't'
+
+  if (!t) {
+    console.warn('Brak kontekstu Trello (currentTContextForPopup) w listenerze wiadomości. Nie można wykonać operacji kontekstowych.');
+    // Możesz chcieć poinformować użytkownika lub popup, że coś poszło nie tak
+    if (event.source && typeof event.source.postMessage === 'function') {
+         // Zakładając, że KAMAN_APP_URL jest poprawnym originem dla odpowiedzi
+        event.source.postMessage({ type: 'trelloContextErrorInMainJs', message: 'Brak kontekstu Trello w Power-Upie (main.js).' }, '*');
+    }
+    return;
+  }
+
+  if (eventData && eventData.pdfUrl && eventData.pdfName) {
+    console.log('Próba dołączenia PDF przez t.attach():', eventData.pdfName);
+    try {
+      // Używamy 't' (czyli currentTContextForPopup), który ma kontekst karty, z której otwarto popup
+      await t.attach({
+        url: eventData.pdfUrl, // To powinien być URL do pliku, np. Blob URL stworzony w UnifiedOfferForm
+        name: eventData.pdfName
+      });
+      t.alert({ message: 'Oferta została zapisana na karcie Trello!', duration: 5, display: 'success' });
+      t.closePopup(); // Zamyka popup, z którego przyszła wiadomość
+    } catch (err) {
+      console.error('Błąd podczas t.attach() w Trello:', err);
+      t.alert({ message: `Błąd dołączania PDF: ${err.message || err}`, duration: 8, display: 'error' });
+    }
+  }
+  // Dodaj obsługę innych typów wiadomości, np. inicjowanie autoryzacji, jeśli nadal tego potrzebujesz
+  // else if (eventData && eventData.type === 'initiateTrelloAuth') { ... }
+});
+console.log('END: main.js Power-Up skrypt zakończył ładowanie, listener wiadomości aktywny.');
