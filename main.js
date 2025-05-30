@@ -2,7 +2,6 @@
 
 // Upewnij się, że ta stała jest poprawna!
 const KAMAN_APP_URL = 'https://kaman-oferty-trello.vercel.app/';
-// const KAMAN_APP_URL = 'http://localhost:5173'; // Dla testów lokalnych
 
 let currentTContextForPopup = null; // Zmienna do przechowywania kontekstu 't' dla operacji z popupu
 
