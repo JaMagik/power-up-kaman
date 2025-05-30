@@ -1,16 +1,17 @@
 // main.js
 const KAMAN_APP_URL = 'https://kaman-oferty-trello.vercel.app/';
 const KAMAN_APP_ORIGIN = new URL(KAMAN_APP_URL).origin;
-const TRELLO_ORIGIN = 'https://trello.com'; // Dodajemy zaufany origin Trello
+const TRELLO_ORIGIN = 'https://trello.com';
 
 let trelloGlobalContext = null;
 
 console.log('START: main.js Power-Up skrypt ładowany. App URL:', KAMAN_APP_URL);
 
 window.addEventListener('message', async (event) => {
-    console.log('MAIN.JS: Odebrano wiadomość:', event.data ? event.data.type : 'brak typu', 'z origin:', event.origin);
+    // !!!!! BARDZO OGÓLNY LOG NA SAMYM POCZĄTKU !!!!!
+    console.log('MAIN.JS - RAW MESSAGE RECEIVED: Origin:', event.origin, 'Data type:', event.data ? event.data.type : 'No data type', 'Full data:', event.data);
 
-    const { type, pdfDataUrl, pdfName, cardId, accessToken, accessTokenSecret } = event.data;
+    const { type, pdfDataUrl, pdfName, cardId, accessToken, accessTokenSecret } = event.data || {}; // Dodano || {} dla bezpieczeństwa
     const t = trelloGlobalContext || window.TrelloPowerUp.iframe();
 
     if (!t) {
@@ -19,46 +20,38 @@ window.addEventListener('message', async (event) => {
     }
     if (!trelloGlobalContext) trelloGlobalContext = t;
 
-    // Sprawdzanie Origin
-    // Dla wiadomości od React popup, oczekujemy KAMAN_APP_ORIGIN
-    // Dla wiadomości z callbacka autoryzacji (który jest częścią KAMAN_APP_URL, ale może być pośredniczony przez Trello),
-    // event.origin może być KAMAN_APP_ORIGIN lub TRELLO_ORIGIN (jeśli Trello jakoś modyfikuje/proxyfikuje source okna auth).
-    // Kluczowe jest, że callback.js wysyła postMessage do window.opener, które jest oknem Trello.
-    // Jeśli callback.js (hostowany na KAMAN_APP_URL) wysyła do openera (Trello), to `event.origin` w main.js dla tej wiadomości będzie KAMAN_APP_URL.
-    // Log, który podałeś "Wiadomość z nieoczekiwanego źródła odrzucona: https://trello.com" sugeruje, że
-    // *jakaś* wiadomość przychodzi z origin https://trello.com.
-    // To może być wiadomość od samego Trello (np. wewnętrzne komunikaty), a niekoniecznie od Twojego callbacka.
-    // Twój callback (z KAMAN_APP_ORIGIN) powinien wysyłać wiadomość, której event.origin będzie KAMAN_APP_ORIGIN.
-
-    // Jeśli log "Wiadomość z nieoczekiwanego źródła odrzucona: https://trello.com" pojawia się
-    // *bezpośrednio po* próbie autoryzacji i zamknięciu okna auth, to jest problematyczne.
-    // Sprawdźmy dokładnie, jaki typ wiadomości jest odrzucany.
-
-    // Bardziej elastyczne sprawdzanie origin, ale z uwzględnieniem typu wiadomości
+    // Dopiero teraz sprawdzanie origin
     let isOriginTrusted = false;
-    if (type === 'TRELLO_AUTH_SUCCESS' && event.origin === KAMAN_APP_ORIGIN) { // Wiadomość od naszego callback.js
+    if (type === 'TRELLO_AUTH_SUCCESS' && event.origin === KAMAN_APP_ORIGIN) {
         isOriginTrusted = true;
-    } else if (type === 'TRELLO_SAVE_PDF' && event.origin === KAMAN_APP_ORIGIN) { // Wiadomość od naszego React popup
+    } else if (type === 'TRELLO_SAVE_PDF' && event.origin === KAMAN_APP_ORIGIN) {
         isOriginTrusted = true;
-    } else if (event.origin === KAMAN_APP_ORIGIN) { // Inne wiadomości z naszego origin
+    } else if (event.origin === KAMAN_APP_ORIGIN) {
         isOriginTrusted = true;
-        console.warn('MAIN.JS: Wiadomość z zaufanego źródła, ale o nieznanym typie lub niekompletna:', event.data);
+        console.warn('MAIN.JS: Wiadomość z KAMAN_APP_ORIGIN, ale o nieznanym typie lub niekompletna:', event.data);
     }
-
 
     if (!isOriginTrusted) {
-        // Jeśli to wiadomość od Trello samego w sobie, a nie nasza, możemy ją zignorować lub zalogować inaczej.
         if (event.origin === TRELLO_ORIGIN) {
-            console.log('MAIN.JS: Otrzymano wiadomość z origin Trello.com, prawdopodobnie wewnętrzna:', event.data);
-        } else {
-            console.warn('MAIN.JS: Wiadomość z nieoczekiwanego źródła odrzucona:', event.origin);
+            // Wiadomości typu "bulk" z Trello są oczekiwane, można je zignorować lub obsłużyć jeśli potrzebne
+            if (type === 'bulk') {
+                console.log('MAIN.JS: Otrzymano wiadomość "bulk" z origin Trello.com, ignorowanie dla logiki aplikacji.', event.data);
+            } else {
+                console.log('MAIN.JS: Otrzymano inną wiadomość z origin Trello.com:', event.data);
+            }
+        } else if (event.origin) { // Jeśli origin jest inny niż KAMAN_APP_ORIGIN i TRELLO_ORIGIN
+            console.warn('MAIN.JS: Wiadomość z nieoczekiwanego źródła odrzucona:', event.origin, 'Dane:', event.data);
         }
-        return;
+        // Jeśli event.origin jest null lub undefined, co może się zdarzyć w niektórych scenariuszach iframe,
+        // ale postMessage zwykle ma ustawiony origin.
+        return; // Zakończ przetwarzanie, jeśli origin nie jest zaufany dla oczekiwanych typów wiadomości
     }
 
-    // Dalsze przetwarzanie, jeśli origin jest zaufany dla danego typu wiadomości
+
+    // Dalsze przetwarzanie tylko jeśli isOriginTrusted = true
     if (type === 'TRELLO_AUTH_SUCCESS' && accessToken && accessTokenSecret) {
-        console.log('MAIN.JS: Otrzymano tokeny autoryzacyjne z callbacka (origin zweryfikowany).');
+        console.log('MAIN.JS: Przetwarzanie TRELLO_AUTH_SUCCESS (origin zweryfikowany).');
+        // ... reszta logiki jak poprzednio ...
         try {
             await t.store('member', 'private', 'authToken', accessToken);
             await t.store('member', 'private', 'authTokenSecret', accessTokenSecret);
@@ -68,9 +61,10 @@ window.addEventListener('message', async (event) => {
             console.error('MAIN.JS: Błąd podczas zapisywania tokenów Trello:', storeError);
             t.alert({ message: 'Nie udało się zapisać tokenów autoryzacyjnych.', duration: 5, display: 'error' });
         }
-    } else if (type === 'TRELLO_SAVE_PDF' && pdfDataUrl && pdfName && cardId) {
-        console.log('MAIN.JS: Otrzymano żądanie zapisu PDF (origin zweryfikowany):', { pdfName, cardId });
 
+    } else if (type === 'TRELLO_SAVE_PDF' && pdfDataUrl && pdfName && cardId) {
+        console.log('MAIN.JS: Przetwarzanie TRELLO_SAVE_PDF (origin zweryfikowany):', { pdfName, cardId });
+        // ... reszta logiki jak poprzednio ...
         try {
             const storedToken = await t.get('member', 'private', 'authToken');
             const storedTokenSecret = await t.get('member', 'private', 'authTokenSecret');
@@ -78,7 +72,7 @@ window.addEventListener('message', async (event) => {
             if (!storedToken || !storedTokenSecret) {
                 console.log('MAIN.JS: Brak tokenów przy próbie zapisu. Informowanie użytkownika.');
                 t.alert({
-                    message: 'Brak autoryzacji. Użyj opcji "Autoryzuj Kaman Oferty" (w menu Power-Upa lub ustawieniach karty), aby się zalogować.',
+                    message: 'Brak autoryzacji. Użyj opcji "Autoryzuj Kaman Oferty", aby się zalogować.',
                     duration: 8,
                     display: 'error'
                 });
@@ -115,20 +109,19 @@ window.addEventListener('message', async (event) => {
             console.error('MAIN.JS: BŁĄD - Wyjątek podczas wywoływania /api/saveToTrello:', error);
             t.alert({ message: `Krytyczny błąd podczas zapisu do Trello: ${error.message}`, duration: 10, display: 'error' });
         }
-    } else if (type) { // Jeśli typ jest, ale nie pasuje do powyższych, a origin był KAMAN_APP_ORIGIN
+
+    } else if (type && isOriginTrusted) { // Jeśli typ jest, ale nie pasuje, a origin był KAMAN_APP_ORIGIN
         console.log('MAIN.JS: Otrzymano znaną, ale nieobsługiwaną wiadomość lub brak wymaganych danych:', event.data);
     }
-    // Jeśli nie było typu, a origin był KAMAN_APP_ORIGIN, zostało to obsłużone przez `console.warn` w bloku sprawdzania origin.
 });
-console.log('MAIN.JS: Listener wiadomości dodany z zaktualizowaną logiką origin.');
+console.log('MAIN.JS: Listener wiadomości dodany z bardzo ogólnym logiem na początku.');
 
-// ... (reszta TrelloPowerUp.initialize bez zmian w stosunku do poprzedniej odpowiedzi)
-// Upewnij się, że `trelloGlobalContext = t;` jest ustawiane w każdym callbacku capability, gdzie `t` jest dostępne.
-
+// ... (reszta kodu TrelloPowerUp.initialize bez zmian, upewnij się, że `trelloGlobalContext = t;` jest ustawiane)
 TrelloPowerUp.initialize({
     'card-buttons': function(t, options) {
         console.log('MAIN.JS: Inicjalizacja card-buttons. Kontekst t:', t);
         trelloGlobalContext = t;
+        // ... reszta callbacku card-buttons
         return [{
             icon: KAMAN_APP_URL + 'vite.svg',
             text: 'Generuj ofertę Kaman',
@@ -160,6 +153,7 @@ TrelloPowerUp.initialize({
     'authorization-status': function(t, options){
         console.log('MAIN.JS: Sprawdzanie statusu autoryzacji. Kontekst t:', t);
         trelloGlobalContext = t;
+        // ... reszta callbacku authorization-status
         return t.get('member', 'private', 'authToken')
             .then(function(authToken){
                 if(authToken){
@@ -177,6 +171,7 @@ TrelloPowerUp.initialize({
     'show-authorization': function(t, options){
         console.log('MAIN.JS: show-authorization wywołane. Otwieranie popupu autoryzacji. Kontekst t:', t);
         trelloGlobalContext = t;
+        // ... reszta callbacku show-authorization
         return t.popup({
             title: 'Autoryzacja Kaman Oferty',
             url: `${KAMAN_APP_URL}api/trelloAuth/start`,
