@@ -20,14 +20,7 @@ TrelloPowerUp.initialize({
     }];
   },
 
-  // Ten endpoint będzie wywoływany z Twojej aplikacji po wygenerowaniu PDF
-  'show-authorization': function(t, options) {
-    return t.popup({
-      title: 'Autoryzacja Trello',
-      url: './authorize.html',
-      height: 140
-    });
-  },
+
 
   // GŁÓWNA logika – attach PDF do karty
   'attachment-sections': function(t, options) {
