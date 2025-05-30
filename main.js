@@ -18,40 +18,28 @@ TrelloPowerUp.initialize({
           });
       }
     }];
-  },
-
-
-
-  // GŁÓWNA logika – attach PDF do karty
-  'attachment-sections': function(t, options) {
-    return [{
-      claimed: [],
-      icon: 'https://cdn.jsdelivr.net/npm/heroicons/outline/document.svg',
-      title: 'Oferty Kaman',
-      content: {
-        type: 'iframe',
-        url: t.signUrl('./attachment-section.html'),
-        height: 800,
-        width: 800
-      }
-    }];
   }
 });
 
-// Funkcja wywoływana z Twojej aplikacji po wygenerowaniu PDF
+// Odbiór PDF z Twojej aplikacji (po wygenerowaniu PDF)
 window.addEventListener('message', async (event) => {
   const { pdfUrl, pdfName } = event.data;
 
   if (pdfUrl && pdfName) {
     const t = window.TrelloPowerUp.iframe();
 
-    await t.attach({
-      url: pdfUrl,
-      name: pdfName,
-      mimeType: 'application/pdf'
-    });
+    try {
+      await t.attach({
+        url: pdfUrl,
+        name: pdfName,
+        mimeType: 'application/pdf'
+      });
 
-    alert('Oferta zapisana na karcie Trello!');
-    t.closePopup();
+      alert('Oferta została zapisana na karcie Trello!');
+      t.closePopup();
+    } catch (err) {
+      console.error('Błąd podczas zapisywania PDF w Trello:', err);
+      alert('Błąd zapisu do Trello.');
+    }
   }
 });
