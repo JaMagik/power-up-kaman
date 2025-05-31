@@ -51,13 +51,13 @@ async function handleSavePdfData(t_context, pdfData) {
         type: pdfData.type,
         pdfName: pdfData.pdfName,
         cardId: pdfData.cardId,
-        pdfDataUrlLength: pdfData.pdfDataUrl ? pdfData.pdfDataUrl.length : 0
+        // Sprawdzamy czy pdfDataUrl istnieje przed próbą odczytania długości
+        pdfDataUrlLength: pdfData.pdfDataUrl ? pdfData.pdfDataUrl.length : (pdfData.pdfDataUrlPreview ? pdfData.pdfDataUrlPreview.length + ' (preview)' : 'N/A')
     });
     const { pdfDataUrl, pdfName, cardId } = pdfData;
 
     if (!t_context) {
         console.error('MAIN.JS - handleSavePdfData: Krytyczny błąd - Brak kontekstu Trello (t_context).');
-        // Próba uzyskania globalnego kontekstu, jeśli t_context jest null
         const fallbackT = trelloGlobalContext || window.TrelloPowerUp.iframe();
         if (fallbackT && fallbackT.alert) {
              fallbackT.alert({message: 'Błąd wewnętrzny: Brak kontekstu Trello do zapisu.', duration: 7, display: 'error'});
@@ -65,11 +65,25 @@ async function handleSavePdfData(t_context, pdfData) {
         return;
     }
 
-    if (!pdfDataUrl || !pdfName || !cardId) {
-        console.error('MAIN.JS - handleSavePdfData: Brak kompletnych danych PDF do zapisu.', pdfData);
-        t_context.alert({message: 'Brak kompletnych danych PDF do zapisu. Spróbuj ponownie.', duration: 5, display: 'error'});
+    // Dla testu minimalnego, pdfDataUrl może nie istnieć, ale pdfName i cardId powinny
+    if ((!pdfDataUrl && pdfData.type === 'TRELLO_SAVE_PDF') || !pdfName || !cardId) {
+        console.error('MAIN.JS - handleSavePdfData: Brak kompletnych danych PDF (lub cardId/pdfName) do zapisu.', pdfData);
+        t_context.alert({message: 'Brak kompletnych danych (PDF/cardId/pdfName) do zapisu. Spróbuj ponownie.', duration: 5, display: 'error'});
         return;
     }
+    
+    // Jeśli to był tylko test komunikacji bez PDF, nie rób nic więcej
+    if (pdfData.type === 'MINIMAL_TEST_SUCCESS' && !pdfDataUrl) {
+        console.log('MAIN.JS - handleSavePdfData: Otrzymano MINIMAL_TEST_SUCCESS bez pdfDataUrl, nie podejmowano próby zapisu do Trello API.');
+        t_context.alert({ message: 'Test komunikacji popup->main.js udany (bez wysyłania PDF)!', duration: 6, display: 'info' });
+        return;
+    }
+    
+    if (pdfData.type !== 'TRELLO_SAVE_PDF') {
+        console.warn('MAIN.JS - handleSavePdfData: Otrzymano dane nie będące typu TRELLO_SAVE_PDF, pomijanie zapisu do API.', pdfData.type);
+        return;
+    }
+
 
     try {
         console.log('MAIN.JS - handleSavePdfData: Pobieranie tokenów...');
@@ -122,50 +136,65 @@ TrelloPowerUp.initialize({
     'board-buttons': function(t, options) {
         console.log('MAIN.JS: Wywołano `board-buttons` capability.');
         trelloGlobalContext = t;
-        return [];
+        return []; // Pusta tablica, jeśli nie ma przycisków na poziomie tablicy
     },
-    'card-buttons': function(t, options) {
-        console.log('MAIN.JS: Inicjalizacja card-buttons.');
-        trelloGlobalContext = t;
+    'card-buttons': function(t_button_context_init, options) { // Zmieniona nazwa dla jasności etapu inicjalizacji
+        console.log('MAIN.JS: Inicjalizacja card-buttons. Kontekst inicjalizacyjny (t_button_context_init):', !!t_button_context_init);
+        trelloGlobalContext = t_button_context_init; // Ustawienie globalnego kontekstu przy inicjalizacji
+        console.log('MAIN.JS: card-buttons (init) - typeof t_button_context_init.popup:', typeof t_button_context_init.popup);
+
         return [{
-            icon: KAMAN_APP_URL + 'vite.svg',
+            icon: KAMAN_APP_URL + 'vite.svg', // Upewnij się, że ta ścieżka jest poprawna i dostępna
             text: 'Generuj ofertę Kaman',
-            callback: function(t_button_context) { // To 't' jest specyficzne dla tego callbacku
-                trelloGlobalContext = t_button_context; // Aktualizuj globalny kontekst
-                console.log('MAIN.JS: Callback "Generuj ofertę Kaman" wywołany. Kontekst przycisku:', t_button_context);
-                return t_button_context.card('id')
+            callback: function(t_callback_context) { // To 't' jest specyficzne dla tego callbacku kliknięcia
+                // Używaj t_callback_context dla operacji związanych z tym konkretnym kliknięciem
+                trelloGlobalContext = t_callback_context; // Możesz zaktualizować globalny kontekst, jeśli potrzebne dla innych operacji
+                console.log('MAIN.JS: Callback "Generuj ofertę Kaman" wywołany. Kontekst przycisku (t_callback_context):', !!t_callback_context);
+                
+                return t_callback_context.card('id')
                     .then(function(card) {
                         if (!card || !card.id) {
                             console.error('MAIN.JS: Nie udało się pobrać ID karty z t.card("id").');
-                            t_button_context.alert({message: 'Nie udało się pobrać ID karty. Spróbuj ponownie.', duration: 5, display: 'error'});
+                            t_callback_context.alert({message: 'Nie udało się pobrać ID karty. Spróbuj ponownie.', duration: 5, display: 'error'});
                             throw new Error('Nie udało się pobrać ID karty.');
                         }
                         const cardId = card.id;
-                        const url = `${KAMAN_APP_URL}?trelloCardId=${cardId}`; // Nadal przydatne jako fallback
+                        // URL dla popupa, przekazanie cardId przez URL query param jest dobrym fallbackiem
+                        const url = `${KAMAN_APP_URL}?trelloCardId=${cardId}`; 
                         console.log('MAIN.JS: Otwieranie popupu z URL:', url, 'i args:', { cardId: cardId });
-                        return t_button_context.popup({
+                        
+                        return t_callback_context.popup({ // Użycie t_callback_context do otwarcia popupu
                             title: 'Generator Ofert Kaman',
                             url: url,
-                            height: 750,
-                            args: { cardId: cardId } // Przekazanie cardId do popupa przez args
+                            height: 750, // Możesz dostosować wysokość
+                            args: { cardId: cardId } // Przekazanie cardId do popupa również przez args
                         });
                     })
-                    .then(function(popupReturnData) {
+                    .then(function(popupReturnData) { // Ten Promise powinien być rozwiązany po t.closePopup()
                         console.log('MAIN.JS - card-buttons .then(): Promise z popupu rozwiązany. Otrzymane dane:', popupReturnData);
-                        if (popupReturnData && typeof popupReturnData === 'object' && popupReturnData.type === 'TRELLO_SAVE_PDF') {
-                            console.log('MAIN.JS: Dane typu TRELLO_SAVE_PDF otrzymane! Wywoływanie handleSavePdfData. Dane:', popupReturnData);
-                            // Użyj t_button_context, który jest 't' z momentu kliknięcia przycisku na karcie
-                            return handleSavePdfData(t_button_context, popupReturnData);
-                        } else if (popupReturnData) {
-                            console.warn('MAIN.JS: Popup React zamknięty, ale zwrócone dane nie są typu TRELLO_SAVE_PDF lub są niekompletne:', popupReturnData);
+                        
+                        if (popupReturnData && typeof popupReturnData === 'object') {
+                            if (popupReturnData.type === 'MINIMAL_TEST_SUCCESS') {
+                                console.log('MAIN.JS: Dane typu MINIMAL_TEST_SUCCESS otrzymane! Dane:', popupReturnData);
+                                t_callback_context.alert({ message: 'MAIN.JS: Otrzymano MINIMAL_TEST_SUCCESS!', duration: 5, display: 'success' });
+                                // Na tym etapie testu minimalnego można zakończyć lub wywołać handleSavePdfData, jeśli chcesz zobaczyć, co zrobi z tymi danymi
+                                // return handleSavePdfData(t_callback_context, popupReturnData); // Odkomentuj jeśli chcesz testować przepływ do handleSavePdfData
+                            } else if (popupReturnData.type === 'TRELLO_SAVE_PDF') {
+                                console.log('MAIN.JS: Dane typu TRELLO_SAVE_PDF otrzymane! Wywoływanie handleSavePdfData. Dane:', popupReturnData);
+                                return handleSavePdfData(t_callback_context, popupReturnData);
+                            } else {
+                                console.warn('MAIN.JS: Popup React zamknięty, ale zwrócone dane nie są oczekiwanego typu (ani MINIMAL_TEST_SUCCESS, ani TRELLO_SAVE_PDF):', popupReturnData);
+                                t_callback_context.alert({ message: 'Otrzymano nieoczekiwane dane z popupu.', duration: 5, display: 'warning' });
+                            }
                         } else {
-                            console.log('MAIN.JS: Popup React zamknięty bez zwrócenia danych (np. przez użytkownika klikającego X lub Esc).');
+                            console.log('MAIN.JS: Popup React zamknięty bez zwrócenia danych (np. przez użytkownika klikającego X lub Esc, lub popupReturnData jest undefined).');
+                            // To jest często normalne zachowanie, jeśli użytkownik zamknie popup manualnie
                         }
                     })
                     .catch(function(error) {
                         console.error('MAIN.JS: Błąd w łańcuchu promise dla t.popup() (card-buttons):', error);
-                        if (t_button_context && t_button_context.alert) {
-                            t_button_context.alert({
+                        if (t_callback_context && t_callback_context.alert) {
+                            t_callback_context.alert({
                                 message: `Wystąpił błąd systemowy Power-Upa: ${error.message || 'Nieznany błąd'}`,
                                 duration: 7, display: 'error'
                             });
@@ -196,12 +225,13 @@ TrelloPowerUp.initialize({
         trelloGlobalContext = t;
         return t.popup({
             title: 'Autoryzacja Kaman Oferty',
-            url: `${KAMAN_APP_URL}api/trelloAuth/start`,
-            height: 680,
-            width: 580,
+            url: `${KAMAN_APP_URL}api/trelloAuth/start`, // Upewnij się, że ten URL jest poprawny
+            height: 680, // Rozsądna wysokość dla okna autoryzacji
+            width: 580,  // Rozsądna szerokość
         });
     }
 }, {
-    appName: 'Kaman Oferty Power-Up'
+    appName: 'Kaman Oferty Power-Up', // Nazwa Twojego Power-Upa
+    appKey: process.env.TRELLO_PUBLIC_API_KEY // Jeśli używasz zmiennej środowiskowej dla klucza API
 });
 console.log('MAIN.JS: TrelloPowerUp.initialize zakończone.');
