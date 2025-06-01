@@ -13,20 +13,20 @@ TrelloPowerUp.initialize({
             }
             const cardId = card.id;
             const url = `${KAMAN_APP_URL}?trelloCardId=${cardId}`;
-            console.log('MAIN.JS: Otwieranie popupu:', url);
-            return t_click_context.popup({
-              title: 'Generator Ofert Kaman',
+            console.log('MAIN.JS: Otwieranie modalu:', url);
+            
+            // użyj t.modal zamiast t.popup
+            return t_click_context.modal({
               url: url,
-              height: 750,
-              width: 900,
+              fullscreen: true,   // ustaw modal na pełny ekran (opcjonalnie)
+              title: 'Generator Ofert Kaman',
               args: { cardId }
             });
           })
-          .then(function (popupReturnData) {
-            console.log('MAIN.JS: popupReturnData:', popupReturnData);
-            if (popupReturnData && popupReturnData.type === 'TRELLO_SAVE_PDF') {
-              const { pdfDataUrl, pdfName } = popupReturnData;
-              // Konwersja base64 -> Blob
+          .then(function (modalReturnData) {
+            console.log('MAIN.JS: modalReturnData:', modalReturnData);
+            if (modalReturnData && modalReturnData.type === 'TRELLO_SAVE_PDF') {
+              const { pdfDataUrl, pdfName } = modalReturnData;
               return fetch(pdfDataUrl)
                 .then(res => res.blob())
                 .then(blob => {
@@ -59,5 +59,3 @@ TrelloPowerUp.initialize({
 }, {
   appName: 'Kaman Oferty Power-Up'
 });
-
-console.log('MAIN.JS: TrelloPowerUp.initialize zakończone.');
