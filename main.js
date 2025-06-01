@@ -166,6 +166,6 @@ TrelloPowerUp.initialize({
     }
 }, {
     appName: 'Kaman Oferty Power-Up',
-    appKey: 'TWÓJ_PUBLICZNY_KLUCZ_API_TRELLO' // <-- WAŻNE: ZASTĄP TO SWOIM KLUCZEM!
+    appKey: '0f932c28c8d97d03741c8863c2ff4afb' // <-- WAŻNE: ZASTĄP TO SWOIM KLUCZEM!
 });
 console.log('MAIN.JS: TrelloPowerUp.initialize zakończone.');
